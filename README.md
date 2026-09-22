@@ -213,12 +213,12 @@ GEMINI_API_KEY=your_gemini_api_key_here
 
 # Firebase Configuration (Required for Realtime Guestbook & Analytics)
 VITE_FIREBASE_API_KEY=your_firebase_api_key
-VITE_FIREBASE_AUTH_DOMAIN=shekhar-jaat-portfolio.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=shekhar-jaat-portfolio
-VITE_FIREBASE_STORAGE_BUCKET=shekhar-jaat-portfolio.firebasestorage.app
-VITE_FIREBASE_MESSAGING_SENDER_ID=28064232504
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=your_firebase_app_id
-VITE_FIREBASE_MEASUREMENT_ID=G-V9FY552BQB
+VITE_FIREBASE_MEASUREMENT_ID=
 ```
 
 ### 4. Run Development Server
