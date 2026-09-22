@@ -245,6 +245,122 @@ class SoundEngine {
       // Audio policy
     }
   }
+
+  public playScannerPing() {
+    if (!this.enabled) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    try {
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1480, t);
+      osc.frequency.exponentialRampToValueAtTime(740, t + 0.45);
+
+      gain.gain.setValueAtTime(0.08, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(t);
+      osc.stop(t + 0.45);
+    } catch {
+      // Audio policy
+    }
+  }
+
+  public playProximityAlert() {
+    if (!this.enabled) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    try {
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(880, t);
+      osc.frequency.setValueAtTime(1174.66, t + 0.08);
+
+      gain.gain.setValueAtTime(0.06, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(t);
+      osc.stop(t + 0.25);
+    } catch {
+      // Audio policy
+    }
+  }
+
+  public playBoostEngage() {
+    if (!this.enabled) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    try {
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const filter = this.ctx.createBiquadFilter();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(60, t);
+      osc.frequency.exponentialRampToValueAtTime(220, t + 0.4);
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(120, t);
+      filter.frequency.exponentialRampToValueAtTime(800, t + 0.35);
+
+      gain.gain.setValueAtTime(0.08, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(t);
+      osc.stop(t + 0.5);
+    } catch {
+      // Audio policy
+    }
+  }
+
+  public playDiscoveryChime() {
+    if (!this.enabled) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    try {
+      const t = this.ctx.currentTime;
+      const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+      notes.forEach((freq, idx) => {
+        const osc = this.ctx!.createOscillator();
+        const gain = this.ctx!.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, t + idx * 0.09);
+
+        gain.gain.setValueAtTime(0.06, t + idx * 0.09);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + idx * 0.09 + 0.35);
+
+        osc.connect(gain);
+        gain.connect(this.ctx!.destination);
+
+        osc.start(t + idx * 0.09);
+        osc.stop(t + idx * 0.09 + 0.35);
+      });
+    } catch {
+      // Audio policy
+    }
+  }
 }
 
 export const sound = new SoundEngine();

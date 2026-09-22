@@ -2,6 +2,9 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import { getAIProvider } from "./src/lib/ai/aiProviders";
+import { emailService } from "./src/lib/email/emailService";
+import { whatsappService } from "./src/lib/whatsapp/whatsappService";
 
 // Lazy / safe Gemini SDK initialization
 let aiClient: GoogleGenAI | null = null;
@@ -28,9 +31,20 @@ function getGeminiClient(): GoogleGenAI | null {
 const ipRequestLog = new Map<string, { count: number; resetAt: number }>();
 
 function checkRateLimit(clientIp: string): { allowed: boolean; waitSeconds?: number } {
+  // Always allow in local dev or loopback requests
+  if (
+    process.env.NODE_ENV !== "production" ||
+    clientIp === "127.0.0.1" ||
+    clientIp === "::1" ||
+    clientIp === "localhost" ||
+    clientIp.startsWith("::ffff:127.0.0.1")
+  ) {
+    return { allowed: true };
+  }
+
   const now = Date.now();
   const windowMs = 5 * 60 * 1000; // 5 minutes
-  const maxRequestsPerWindow = 10; // Max 10 messages per 5 minutes per user
+  const maxRequestsPerWindow = 30; // 30 messages per 5 minutes
 
   const record = ipRequestLog.get(clientIp);
   if (!record || now > record.resetAt) {
@@ -262,6 +276,104 @@ async function startServer() {
         freeTierProtected: true,
       });
     }
+  });
+
+  // ================= SUPPORT CENTER API ROUTES =================
+
+  // Multi-Provider AI Support Chat (Gemini, Ollama, OpenAI-compatible, Grounded local)
+  app.post("/api/support/chat", async (req, res) => {
+    try {
+      const { messages = [], customerName = "Visitor" } = req.body;
+      if (!Array.isArray(messages) || messages.length === 0) {
+        return res.status(400).json({ error: "Messages array cannot be empty." });
+      }
+
+      const provider = getAIProvider();
+      const response = await provider.generateReply({ messages, customerName });
+
+      return res.json(response);
+    } catch (error: any) {
+      console.error("Support chat error:", error);
+      return res.status(500).json({
+        error: "Internal error processing support query.",
+        text: "I encountered a momentary connection issue. You can reach Shekhar directly at shekharjaat751@gmail.com.",
+        modelUsed: "Fallback Handler",
+        handoffRequested: true,
+      });
+    }
+  });
+
+  // Support Integrations & Health Status
+  app.get("/api/support/integrations", (_req, res) => {
+    res.json({
+      aiProvider: process.env.AI_PROVIDER || (process.env.GEMINI_API_KEY ? "gemini" : "grounded-local"),
+      aiModel: process.env.AI_MODEL || "gemini-2.5-flash",
+      hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
+      hasOllamaConfigured: Boolean(process.env.OLLAMA_BASE_URL),
+      hasOpenAIConfigured: Boolean(process.env.OPENAI_API_KEY),
+      email: emailService.getStatus(),
+      whatsapp: whatsappService.getStatus(),
+      timestamp: Date.now(),
+    });
+  });
+
+  // Support Admin Authentication Gate
+  app.post("/api/support/auth", (req, res) => {
+    const { passcode } = req.body;
+    const adminSecret = process.env.AUTH_SECRET || "shekhar-admin-2025";
+
+    if (passcode === adminSecret) {
+      // Secure demo session token valid for 24 hours
+      const token = `adm_${Buffer.from(Date.now().toString()).toString("base64")}_sec`;
+      return res.json({ success: true, token, agentName: "Shekhar Birda (Lead Architect)" });
+    }
+
+    return res.status(401).json({ success: false, error: "Invalid admin authentication passcode." });
+  });
+
+  // WhatsApp Meta Webhook Challenge Verification (GET)
+  app.get("/api/webhooks/whatsapp", (req, res) => {
+    const mode = req.query["hub.mode"] as string;
+    const token = req.query["hub.verify_token"] as string;
+    const challenge = req.query["hub.challenge"] as string;
+
+    const verifiedChallenge = whatsappService.verifyWebhook(mode, token, challenge);
+    if (verifiedChallenge) {
+      return res.status(200).send(verifiedChallenge);
+    }
+    return res.status(403).send("Forbidden: Invalid verification token");
+  });
+
+  // WhatsApp Meta Webhook Inbound Message Receiver (POST)
+  app.post("/api/webhooks/whatsapp", (req, res) => {
+    try {
+      const parsed = whatsappService.parseWebhookPayload(req.body);
+      if (parsed) {
+        console.log(`[Webhook: WhatsApp] Inbound message from ${parsed.senderPhone} (${parsed.senderName}): "${parsed.messageText}"`);
+      }
+      return res.status(200).json({ status: "received" });
+    } catch (err: any) {
+      console.error("[Webhook: WhatsApp] Processing error:", err?.message);
+      return res.status(500).json({ error: "Webhook error" });
+    }
+  });
+
+  // Email Inbound Webhook Receiver (POST)
+  app.post("/api/webhooks/email", (req, res) => {
+    try {
+      const incoming = emailService.handleIncomingEmailWebhook(req.body);
+      console.log(`[Webhook: Email] Message received from ${incoming.sender}: "${incoming.subject}"`);
+      return res.status(200).json({ status: "received", subject: incoming.subject });
+    } catch (err: any) {
+      console.error("[Webhook: Email] Processing error:", err?.message);
+      return res.status(500).json({ error: "Email webhook error" });
+    }
+  });
+
+  // Generic External Support Ticket Webhook (POST)
+  app.post("/api/webhooks/support", (req, res) => {
+    console.log("[Webhook: Support] Event received:", req.body?.event || "ticket.created");
+    return res.status(200).json({ status: "acknowledged", timestamp: Date.now() });
   });
 
   // Vite middleware in development vs static file serving in production

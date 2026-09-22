@@ -1,51 +1,89 @@
 @import "tailwindcss";
 
 @theme {
-  --color-midnight: #0f172a;
-  --color-deep-midnight: #0f172a;
-  --color-slate-grey: #475569;
-  --color-astral-white: #f1f5f9;
-  --color-astral: #f1f5f9;
+  --color-space-950: #030712;
+  --color-space-900: #07111f;
+  --color-space-850: #0b192e;
+  --color-space-800: #132238;
+  --color-space-700: #1e3a5f;
+  --color-space-600: #33537a;
+  --color-space-500: #4b729f;
+  --color-space-400: #7196c2;
+  --color-space-300: #9cbde5;
+  --color-space-200: #c9def7;
+  --color-space-100: #eaf2fd;
 
-  --color-space-950: #080d1a;
-  --color-space-900: #0f172a;
-  --color-space-850: #141f36;
-  --color-space-800: #1e293b;
-  --color-space-700: #334155;
-  --color-space-600: #475569;
-  --color-space-500: #64748b;
-  --color-space-400: #94a3b8;
-  --color-space-300: #cbd5e1;
-  --color-space-200: #e2e8f0;
-  --color-space-100: #f1f5f9;
+  --color-cyan-glow: #38bdf8;
+  --color-gold-glow: #f59e0b;
+  --color-emerald-glow: #10b981;
 
-  --font-display: 'Orbitron', 'Rajdhani', sans-serif;
-  --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-display: 'Space Grotesk', 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: 'Outfit', 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'JetBrains Mono', monospace;
 }
 
 @layer base {
   :root {
-    --font-display: 'Orbitron', 'Rajdhani', sans-serif;
-    --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    --bg-universe: #030712;
+    --bg-panel: rgba(7, 17, 31, 0.75);
+    --bg-panel-border: rgba(56, 189, 248, 0.2);
+    --text-primary: #f8fafc;
+    --text-muted: #94a3b8;
+    --accent-glow: #38bdf8;
+    --hud-highlight: rgba(56, 189, 248, 0.12);
+  }
+
+  .theme-light {
+    --bg-universe: #f4f1e8;
+    --bg-panel: rgba(255, 255, 255, 0.88);
+    --bg-panel-border: rgba(15, 23, 42, 0.12);
+    --text-primary: #0f172a;
+    --text-muted: #64748b;
+    --accent-glow: #2563eb;
+    --hud-highlight: rgba(37, 99, 235, 0.08);
   }
 
   body {
-    background-color: #0f172a;
-    color: #f1f5f9;
+    background-color: var(--bg-universe);
+    color: var(--text-primary);
     font-family: var(--font-sans);
     letter-spacing: -0.01em;
+    transition: background-color 0.4s ease, color 0.4s ease;
   }
 
   h1, h2, h3, h4, .font-display {
     font-family: var(--font-display);
-    letter-spacing: 0.04em;
+    letter-spacing: -0.02em;
   }
 
   code, pre, .font-mono {
     font-family: var(--font-mono);
   }
+}
+
+/* Subtle Technical HUD elements */
+.hud-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--bg-panel-border);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.theme-light .hud-panel {
+  box-shadow: 0 8px 32px 0 rgba(15, 23, 42, 0.08);
+}
+
+.hud-button {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hud-button:hover {
+  border-color: var(--accent-glow);
+  box-shadow: 0 0 16px -2px var(--accent-glow);
 }
 
 /* Refined Deep Space Scrollbars */
@@ -54,12 +92,12 @@
   height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #475569;
+  background: rgba(148, 163, 184, 0.3);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: rgba(148, 163, 184, 0.6);
 }

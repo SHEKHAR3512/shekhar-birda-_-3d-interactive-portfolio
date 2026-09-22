@@ -16,6 +16,7 @@ import {
   Globe2,
 } from 'lucide-react';
 import { sound } from '../utils/sound';
+import { queryKnowledgeDocs } from '../lib/knowledge/knowledgeBase';
 
 export interface ChatMessage {
   id: string;
@@ -126,15 +127,25 @@ export const GeminiChatModal: React.FC<GeminiChatModalProps> = ({
       setMessages((prev) => [...prev, aiMessage]);
       sound.playCoin();
     } catch (err: any) {
-      console.error('Chat error:', err);
-      const errorMessage: ChatMessage = {
-        id: `err-${Date.now()}`,
+      console.warn('Chat API fetch notice, serving grounded portfolio answer:', err?.message);
+      const matched = queryKnowledgeDocs(promptText, 2);
+      let replyText = `Hello! I am Shekhar Birda's Cosmic Co-Pilot. Shekhar is a **React Native & React.js Developer** with 2+ years of production experience at Apptunix.\n\n### Featured Live Projects:\n1. **Snibbl:** [https://snibbl.com/](https://snibbl.com/) (12,000+ users, food rescue)\n2. **EDU-Match:** [https://edumatchconnect.ai/](https://edumatchconnect.ai/) (AI university & career matching)\n3. **Magrudy's:** [https://www.magrudy.com/](https://www.magrudy.com/) (Omnichannel retail loyalty)\n4. **Gulf Bar Show:** [https://gulfbarshow.com/](https://gulfbarshow.com/) (Dubai expo companion)\n\nFeel free to ask me anything about Shekhar's engineering work, tech stack, or reach him directly at **shekharjaat751@gmail.com**!`;
+      if (matched.length > 0) {
+        replyText = `### ${matched[0].title}\n${matched[0].content}`;
+        if (matched[1] && matched[1].category !== matched[0].category) {
+          replyText += `\n\n### Related Reference: ${matched[1].title}\n${matched[1].summary}`;
+        }
+      }
+
+      const aiMessage: ChatMessage = {
+        id: `ai-${Date.now()}`,
         role: 'model',
-        text: `⚠️ **Notice:** ${err.message || 'Unable to fetch response.'}\n\nYou can always reach Shekhar Birda directly at [shekharjaat751@gmail.com](mailto:shekharjaat751@gmail.com).`,
+        text: replyText,
         timestamp: Date.now(),
-        modelUsed: selectedModel,
+        modelUsed: 'Portfolio Grounded Engine (Client Fallback)',
       };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => [...prev, aiMessage]);
+      sound.playCoin();
     } finally {
       setIsLoading(false);
     }

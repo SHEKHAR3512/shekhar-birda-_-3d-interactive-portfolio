@@ -1,64 +1,95 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { ThreeCanvas } from './components/ThreeCanvas';
-import { HUD } from './components/HUD';
-import { ProjectModal } from './components/ProjectModal';
-import { SkillPlanetModal } from './components/SkillPlanetModal';
-import { SuggestionsModal } from './components/SuggestionsModal';
-import { ExecutiveView } from './components/ExecutiveView';
-import { GuestbookModal } from './components/GuestbookModal';
-import { CodeInspectorModal } from './components/CodeInspectorModal';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Navbar } from './components/navigation/Navbar';
+import { ResumeLandingView } from './components/resume/ResumeLandingView';
+import { MissionBootSequence } from './components/mission/MissionBootSequence';
+import { SolarSystemScene } from './components/solar-system/SolarSystemScene';
+import { CockpitOverlay } from './components/hud/CockpitOverlay';
+import { MissionTelemetry } from './components/hud/MissionTelemetry';
+import { PilotCard } from './components/hud/PilotCard';
+import { PlanetTooltip } from './components/hud/PlanetTooltip';
+import { FlightControlsOverlay } from './components/hud/FlightControlsOverlay';
+import { NavigationGuideOverlay } from './components/hud/NavigationGuideOverlay';
+import { ProjectDossier } from './components/hologram/ProjectDossier';
+import { OnbordaTour } from './components/onborda/OnbordaTour';
+import { ProjectDatabaseModal } from './components/mission/ProjectDatabaseModal';
+import { MissionMapView } from './components/mission/MissionMapView';
+import { MissionCompleteView } from './components/mission/MissionCompleteView';
 import { ContactModal } from './components/ContactModal';
 import { GeminiChatModal } from './components/GeminiChatModal';
-import { PROJECTS, COLLECTIBLE_ITEMS, SKILL_PLANETS } from './data/portfolioData';
-import { Project, CollectibleItem, ViewMode, CameraView, SkillPlanet } from './types';
+import { GuestbookModal } from './components/GuestbookModal';
+import { ViewModeSelector } from './components/hud/ViewModeSelector';
+import { SupportWidget } from './components/support/SupportWidget';
+import { CustomerSupportPortal } from './components/support/CustomerSupportPortal';
+import { SupportDashboard } from './components/support/SupportDashboard';
+import { Database, Bot, MessageSquare } from 'lucide-react';
+
+import { useMissionStore } from './store/missionStore';
+import { MISSION_PROJECTS } from './data/projects';
 import { sound } from './utils/sound';
 import confetti from 'canvas-confetti';
 
 export default function App() {
-  const [viewMode, setViewMode] = useState<ViewMode>('3d');
-  const [projects, setProjects] = useState<Project[]>(PROJECTS);
-  const [skillPlanets] = useState<SkillPlanet[]>(SKILL_PLANETS);
-  const [collectibles, setCollectibles] = useState<CollectibleItem[]>(COLLECTIBLE_ITEMS);
+  // Client-side routing for dedicated /support and /support/admin routes
+  const [currentRoute, setCurrentRoute] = useState<'portfolio' | 'support' | 'admin'>(() => {
+    if (typeof window !== 'undefined') {
+      if (window.location.pathname.startsWith('/support/admin')) return 'admin';
+      if (window.location.pathname.startsWith('/support')) return 'support';
+    }
+    return 'portfolio';
+  });
 
-  // Active Modals & Celestial Targets
-  const [activeProject, setActiveProject] = useState<Project | null>(null);
-  const [activeSkillPlanet, setActiveSkillPlanet] = useState<SkillPlanet | null>(null);
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname;
+      if (path.startsWith('/support/admin')) {
+        setCurrentRoute('admin');
+      } else if (path.startsWith('/support')) {
+        setCurrentRoute('support');
+      } else {
+        setCurrentRoute('portfolio');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigateTo = (route: 'portfolio' | 'support' | 'admin') => {
+    const path = route === 'admin' ? '/support/admin' : route === 'support' ? '/support' : '/';
+    window.history.pushState({}, '', path);
+    setCurrentRoute(route);
+  };
+
+  const theme = useMissionStore((state) => state.theme);
+  const toggleTheme = useMissionStore((state) => state.toggleTheme);
+  const currentExperience = useMissionStore((state) => state.currentExperience);
+  const missionStatus = useMissionStore((state) => state.missionStatus);
+  const currentPlanet = useMissionStore((state) => state.currentPlanet);
+  const selectPlanet = useMissionStore((state) => state.selectPlanet);
+  const returnToResume = useMissionStore((state) => state.returnToResume);
+  const enterSolarSystem = useMissionStore((state) => state.enterSolarSystem);
+  const discoveredPlanets = useMissionStore((state) => state.discoveredPlanets);
+  const cameraMode = useMissionStore((state) => state.cameraMode);
+  const setCameraMode = useMissionStore((state) => state.setCameraMode);
+
+  // Modals & Overlays
+  const [showProjectsModal, setShowProjectsModal] = useState(false);
+  const [showMissionComplete, setShowMissionComplete] = useState(false);
   const [showContact, setShowContact] = useState(false);
+  const [showGeminiChat, setShowGeminiChat] = useState(false);
+  const [showGuestbook, setShowGuestbook] = useState(false);
   const [contactSubject, setContactSubject] = useState<string | undefined>(undefined);
   const [contactBody, setContactBody] = useState<string | undefined>(undefined);
-  const [showGuestbook, setShowGuestbook] = useState(false);
-  const [showCodeInspector, setShowCodeInspector] = useState(false);
-  const [showGeminiChat, setShowGeminiChat] = useState(false);
 
-  // Spaceflight & Camera State
-  const [cameraView, setCameraView] = useState<CameraView>('follow');
-  const [isNightMode, setIsNightMode] = useState(true);
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [speed, setSpeed] = useState(0);
-  const [carPosition, setCarPosition] = useState<[number, number]>([0, 16]);
-  const [resetTrigger, setResetTrigger] = useState(0);
-  const [warpTarget, setWarpTarget] = useState<{ x: number; y: number; z: number } | null>(null);
+  // Sync theme with document element
+  useEffect(() => {
+    if (theme === 'light') {
+      document.documentElement.classList.add('theme-light');
+    } else {
+      document.documentElement.classList.remove('theme-light');
+    }
+  }, [theme]);
 
-  // Live tunable physics
-  const [physicsSettings, setPhysicsSettings] = useState({
-    maxSpeed: 16.0,
-    acceleration: 20.0,
-    turnSpeed: 2.4,
-    jumpForce: 1.0,
-  });
-
-  // Zero-latency frame loop input ref
-  const carInputRef = useRef({
-    forward: false,
-    backward: false,
-    left: false,
-    right: false,
-    turbo: false,
-    brake: false,
-  });
-
-  // Start sound on first user gesture
+  // Audio gesture initialization
   const startAudioOnGesture = useCallback(() => {
     sound.startEngine();
     window.removeEventListener('keydown', startAudioOnGesture);
@@ -74,275 +105,235 @@ export default function App() {
     };
   }, [startAudioOnGesture]);
 
+  // Trigger confetti when all planets are discovered
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [viewMode]);
-
-  // Warp to a project planet
-  const handleSelectProject = (p: Project | null) => {
-    setActiveProject(p);
-    if (p) {
-      setWarpTarget({ x: p.worldPosition[0], y: p.worldPosition[1], z: p.worldPosition[2] });
+    if (discoveredPlanets.length === 8 && missionStatus === 'completed') {
+      confetti({
+        particleCount: 120,
+        spread: 80,
+        origin: { y: 0.6 },
+        colors: ['#38bdf8', '#00f5ff', '#818cf8', '#ffffff']
+      });
+      setShowMissionComplete(true);
     }
-  };
+  }, [discoveredPlanets.length, missionStatus]);
 
-  // Warp to a skill planet
-  const handleSelectSkillPlanet = (sp: SkillPlanet | null) => {
-    setActiveSkillPlanet(sp);
-    if (sp) {
-      setWarpTarget({ x: sp.worldPosition[0], y: sp.worldPosition[1], z: sp.worldPosition[2] });
-    }
-  };
-
-  // Keyboard Navigation
+  // Global Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
-        return;
-      }
-
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
       const k = e.key.toLowerCase();
 
-      // Warp directly to projects with 1-5 keys
-      if (['1', '2', '3', '4', '5'].includes(k)) {
-        const index = parseInt(k, 10) - 1;
-        if (projects[index]) {
-          handleSelectProject(projects[index]);
+      // Camera view modes in solar system mode (Keys 1-5, o, k, i, m)
+      if (currentExperience === 'solar-system') {
+        if (k === '1') {
+          setCameraMode('flight');
           sound.playClick();
           return;
+        } else if (k === '2' || k === 'o') {
+          setCameraMode('orbit');
+          sound.playClick();
+          return;
+        } else if (k === '3' || k === 'k') {
+          setCameraMode('cinematic');
+          sound.playClick();
+          return;
+        } else if (k === '4' || k === 'i') {
+          setCameraMode('isometric');
+          sound.playClick();
+          return;
+        } else if (k === '5' || k === 'm') {
+          setCameraMode('chart');
+          sound.playClick();
+          return;
+        } else if (['6', '7', '8'].includes(k)) {
+          const index = parseInt(k, 10) - 1;
+          const project = MISSION_PROJECTS[index];
+          if (project) {
+            selectPlanet(project.id);
+            sound.playClick();
+            return;
+          }
         }
       }
 
-      if (k === 'w' || e.key === 'ArrowUp') {
-        carInputRef.current.forward = true;
-      } else if (k === 's' || e.key === 'ArrowDown') {
-        carInputRef.current.backward = true;
-      } else if (k === 'a' || e.key === 'ArrowLeft') {
-        carInputRef.current.left = true;
-      } else if (k === 'd' || e.key === 'ArrowRight') {
-        carInputRef.current.right = true;
-      } else if (e.code === 'Space') {
-        carInputRef.current.turbo = true;
-        e.preventDefault();
+      if (e.key === 'Escape') {
+        selectPlanet(null);
+        setShowProjectsModal(false);
+        setShowMissionComplete(false);
+        setShowContact(false);
+        setShowGeminiChat(false);
+        setShowGuestbook(false);
       } else if (k === 'c') {
         setContactSubject(undefined);
         setContactBody(undefined);
         setShowContact(true);
         sound.playClick();
+      } else if (k === 'p') {
+        setShowProjectsModal((prev) => !prev);
+        sound.playClick();
+        /* Chatbot hotkey commented out for now:
       } else if (k === 'g') {
         setShowGeminiChat((prev) => !prev);
         sound.playClick();
-      } else if (k === 'u') {
-        setShowSuggestions((prev) => !prev);
-        sound.playClick();
-      } else if (k === 'v') {
-        setViewMode((prev) => (prev === '3d' ? 'executive' : '3d'));
-        sound.playClick();
-      } else if (k === 'r') {
-        setResetTrigger((prev) => prev + 1);
-        setWarpTarget({ x: 0, y: 2, z: 16 });
-      } else if (k === 'm') {
-        setSoundEnabled((prev) => {
-          const next = !prev;
-          sound.setEnabled(next);
-          return next;
-        });
-      } else if (e.key === 'Escape') {
-        setActiveProject(null);
-        setActiveSkillPlanet(null);
-        setShowSuggestions(false);
-        setShowContact(false);
-        setShowGuestbook(false);
-        setShowCodeInspector(false);
-        setShowGeminiChat(false);
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
-        return;
-      }
-
-      const k = e.key.toLowerCase();
-      if (k === 'w' || e.key === 'ArrowUp') {
-        carInputRef.current.forward = false;
-      } else if (k === 's' || e.key === 'ArrowDown') {
-        carInputRef.current.backward = false;
-      } else if (k === 'a' || e.key === 'ArrowLeft') {
-        carInputRef.current.left = false;
-      } else if (k === 'd' || e.key === 'ArrowRight') {
-        carInputRef.current.right = false;
-      } else if (e.code === 'Space') {
-        carInputRef.current.turbo = false;
+        */
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, [projects]);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentExperience, selectPlanet, toggleTheme]);
 
-  // Handle Touch input from HUD
-  const handleVirtualInput = (action: string, active: boolean) => {
-    sound.startEngine();
-    if (action === 'forward') carInputRef.current.forward = active;
-    if (action === 'backward') carInputRef.current.backward = active;
-    if (action === 'left') carInputRef.current.left = active;
-    if (action === 'right') carInputRef.current.right = active;
-    if (action === 'turbo') carInputRef.current.turbo = active;
-  };
-
-  // Collect item handler
-  const handleCollectItem = (id: string) => {
-    setCollectibles((prev) => {
-      const next = prev.map((item) => (item.id === id ? { ...item, collected: true } : item));
-      const newlyCollected = next.filter((i) => i.collected).length;
-      if (newlyCollected === next.length) {
-        confetti({
-          particleCount: 120,
-          spread: 80,
-          origin: { y: 0.6 },
-        });
-      }
-      return next;
-    });
-  };
-
-  // Like project handler
-  const handleLikeProject = (projectId: string) => {
-    setProjects((prev) =>
-      prev.map((p) => (p.id === projectId ? { ...p, likes: p.likes + 1 } : p))
+  if (currentRoute === 'support') {
+    return (
+      <CustomerSupportPortal
+        onReturnToPortfolio={() => navigateTo('portfolio')}
+        onOpenAdmin={() => navigateTo('admin')}
+      />
     );
-  };
+  }
 
-  const collectedCount = collectibles.filter((c) => c.collected).length;
+  if (currentRoute === 'admin') {
+    return (
+      <SupportDashboard
+        onReturnToPortfolio={() => navigateTo('portfolio')}
+        onOpenPortal={() => navigateTo('support')}
+      />
+    );
+  }
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#03050c] text-slate-100 select-none">
-      {viewMode === '3d' ? (
-        <>
-          {/* 3D WebGL Space Cosmos Canvas */}
-          <ThreeCanvas
-            projects={projects}
-            skillPlanets={skillPlanets}
-            collectibles={collectibles}
-            activeProject={activeProject}
-            activeSkillPlanet={activeSkillPlanet}
-            onSelectProject={handleSelectProject}
-            onSelectSkillPlanet={handleSelectSkillPlanet}
-            onCollectItem={handleCollectItem}
-            cameraView={cameraView}
-            isNightMode={isNightMode}
-            onUpdateSpeed={setSpeed}
-            onUpdateCarPosition={setCarPosition}
-            carInputRef={carInputRef}
-            resetTrigger={resetTrigger}
-            warpTarget={warpTarget}
-          />
+    <div
+      className={`relative w-screen h-screen overflow-hidden select-none transition-colors duration-400 flex flex-col ${
+        theme === 'light' ? 'bg-[#f4f1e8] text-[#0f172a]' : 'bg-[#030712] text-[#f8fafc]'
+      }`}
+    >
+      {/* Spacecraft Navigation Header */}
+      <Navbar
+        onOpenResume={() => returnToResume()}
+        onOpenContact={() => {
+          setContactSubject(undefined);
+          setContactBody(undefined);
+          setShowContact(true);
+        }}
+        onOpenProjectsMap={() => setShowProjectsModal(true)}
+        onOpenSupport={() => navigateTo('support')}
+      />
 
-          {/* Space Flight HUD Interface */}
-          <HUD
-            speed={speed}
-            carPosition={carPosition}
-            projects={projects}
-            skillPlanets={skillPlanets}
-            collectibles={collectibles}
-            collectedCount={collectedCount}
-            cameraView={cameraView}
-            onChangeCamera={setCameraView}
-            isNightMode={isNightMode}
-            onToggleNightMode={() => setIsNightMode(!isNightMode)}
-            soundEnabled={soundEnabled}
-            onToggleSound={() => {
-              const next = !soundEnabled;
-              setSoundEnabled(next);
-              sound.setEnabled(next);
-            }}
-            onResetCar={() => {
-              setResetTrigger((prev) => prev + 1);
-              setWarpTarget({ x: 0, y: 2, z: 16 });
-            }}
-            onHonkHorn={() => sound.playHorn()}
-            onSwitchMode={() => setViewMode('executive')}
-            onOpenGuestbook={() => setShowGuestbook(true)}
-            onOpenCodeInspector={() => setShowCodeInspector(true)}
-            onOpenSuggestions={() => setShowSuggestions(true)}
-            onOpenGeminiChat={() => setShowGeminiChat(true)}
+      {/* Main View Area */}
+      <main className="relative flex-1 w-full h-full overflow-hidden">
+        {/* ================= EXPERIENCE 1: RESUME LANDING PAGE (FIRST SCREEN) ================= */}
+        {currentExperience === 'resume' && (
+          <ResumeLandingView
             onOpenContact={() => {
               setContactSubject(undefined);
               setContactBody(undefined);
               setShowContact(true);
             }}
-            onSelectProject={handleSelectProject}
-            onSelectSkillPlanet={handleSelectSkillPlanet}
-            onVirtualInput={handleVirtualInput}
+            onOpenDossier={(projectId) => {
+              selectPlanet(projectId);
+              enterSolarSystem();
+            }}
           />
-        </>
-      ) : (
-        /* Executive Resume & Architecture View */
-        <ExecutiveView
-          onSwitchTo3D={() => setViewMode('3d')}
-          onSelectProject={handleSelectProject}
-          onOpenGuestbook={() => setShowGuestbook(true)}
-          onOpenCodeInspector={() => setShowCodeInspector(true)}
-          onOpenGeminiChat={() => setShowGeminiChat(true)}
+        )}
+
+        {/* ================= MISSION BOOT SEQUENCE (2-3s TRANSITION) ================= */}
+        {currentExperience === 'mission-boot' && (
+          <MissionBootSequence />
+        )}
+
+        {/* ================= EXPERIENCE 2: CONTROLLABLE SPACECRAFT SOLAR SYSTEM ================= */}
+        {currentExperience === 'solar-system' && (
+          <>
+            {/* 3D WebGL Flight Canvas */}
+            <SolarSystemScene />
+
+            {/* Spaceship Cockpit Overlay & Coordinates Telemetry */}
+            <CockpitOverlay />
+
+            {/* Tactical Camera View Mode Selector (Flight, Orbit, Cinematic, Isometric, Chart) */}
+            <ViewModeSelector />
+
+            {/* Top-Right Mission Telemetry (Status, Discovered count, XP) */}
+            <MissionTelemetry />
+
+            {/* Pilot Profile Card */}
+            <PilotCard />
+
+            {/* Navigation Guide, Target Selector & Auto Pilot Toggle */}
+            <NavigationGuideOverlay onOpenProjects={() => setShowProjectsModal(true)} />
+
+            {/* Desktop & Mobile Virtual Flight Controls */}
+            <FlightControlsOverlay />
+
+            {/* Floating Planet Hover Tooltips */}
+            <PlanetTooltip />
+
+            {/* Holographic Project Dossier & Pilot Guide (when in orbit) */}
+            <ProjectDossier />
+
+            {/* Onborda 6-Step Product Tour */}
+            <OnbordaTour />
+
+            {/* Bottom Floating Utility Buttons (Cleanly positioned above the flight controls bar; hidden in Chart mode to prevent waypoint overlap) */}
+            {!currentPlanet && cameraMode !== 'chart' && (
+              <div className="absolute bottom-[4.5rem] left-1/2 -translate-x-1/2 z-20 flex items-center gap-2.5 animate-fadeIn pointer-events-auto">
+                <button
+                  onClick={() => setShowProjectsModal(true)}
+                  className="px-3.5 py-1.5 rounded-lg border border-sky-400/40 bg-[#07111f]/90 hover:bg-sky-500/25 text-sky-200 hover:text-white font-mono text-[11px] tracking-wider transition-all flex items-center gap-1.5 shadow-[0_0_15px_rgba(56,189,248,0.25)] hover:border-sky-300 cursor-pointer"
+                >
+                  <Database className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Projects [P]</span>
+                </button>
+
+                {/* AI Copilot Chatbot Button (Commented out for now)
+                <button
+                  onClick={() => setShowGeminiChat(true)}
+                  className="px-3.5 py-1.5 rounded-lg border border-sky-400/40 bg-[#07111f]/90 hover:bg-sky-500/25 text-sky-200 hover:text-white font-mono text-[11px] tracking-wider transition-all flex items-center gap-1.5 shadow-[0_0_15px_rgba(56,189,248,0.25)] hover:border-sky-300 cursor-pointer"
+                >
+                  <Bot className="w-3.5 h-3.5 text-sky-400" />
+                  <span>AI Copilot [G]</span>
+                </button>
+                */}
+
+                <button
+                  onClick={() => setShowGuestbook(true)}
+                  className="px-3.5 py-1.5 rounded-lg border border-slate-700/70 bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white font-mono text-[11px] tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Guestbook</span>
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </main>
+
+      {/* Accessible 2D Project Database Directory Modal */}
+      {showProjectsModal && (
+        <ProjectDatabaseModal
+          onClose={() => setShowProjectsModal(false)}
+          onOpenDossier={(id) => {
+            selectPlanet(id);
+            enterSolarSystem();
+          }}
+        />
+      )}
+
+      {/* Mission Complete Celebration Screen */}
+      {showMissionComplete && (
+        <MissionCompleteView
+          onClose={() => setShowMissionComplete(false)}
+          onOpenResume={() => returnToResume()}
           onOpenContact={() => {
-            setContactSubject(undefined);
-            setContactBody(undefined);
+            setContactSubject('Mission Complete Inquiry');
+            setContactBody("Hi Shekhar,\n\nI just explored your complete space solar system portfolio and would love to connect regarding upcoming engineering opportunities.\n\nBest regards,\n");
             setShowContact(true);
           }}
         />
       )}
 
-      {/* Project Planet Case Study Modal */}
-      {activeProject && (
-        <ProjectModal
-          project={activeProject}
-          onClose={() => setActiveProject(null)}
-          onLikeProject={handleLikeProject}
-          onOpenContactForProject={(title) => {
-            setContactSubject(`Inquiry regarding ${title} architecture & build`);
-            setContactBody(`Hi Shekhar,\n\nI was exploring your space portfolio and reviewed ${title}. I'd love to discuss how you can build similar high-performance systems for our team.\n\nBest regards,\n`);
-            setShowContact(true);
-          }}
-        />
-      )}
-
-      {/* Skill Planet Deep Dive Modal */}
-      {activeSkillPlanet && (
-        <SkillPlanetModal
-          planet={activeSkillPlanet}
-          onClose={() => setActiveSkillPlanet(null)}
-          onOpenContactForSkill={(domain) => {
-            setContactSubject(`Consultation / Role regarding ${domain}`);
-            setContactBody(`Hi Shekhar,\n\nI was inspecting ${activeSkillPlanet.name} in your 3D portfolio and saw your deep work in ${domain}.\n\nLet's connect to discuss our upcoming projects.\n\nBest regards,\n`);
-            setShowContact(true);
-          }}
-        />
-      )}
-
-      {/* Interactive Suggestions & Scope Advisor Modal */}
-      {showSuggestions && (
-        <SuggestionsModal
-          onClose={() => setShowSuggestions(false)}
-          onSelectProjectRef={(projectId) => {
-            const match = projects.find((p) => p.id === projectId);
-            if (match) {
-              handleSelectProject(match);
-            }
-          }}
-          onOpenContact={(subj, body) => {
-            setContactSubject(subj);
-            setContactBody(body);
-            setShowContact(true);
-          }}
-        />
-      )}
-
-      {/* Free Direct Contact Hub (Email, WhatsApp, vCard, Booking) */}
+      {/* Direct Contact Modal */}
       {showContact && (
         <ContactModal
           initialSubject={contactSubject}
@@ -351,21 +342,7 @@ export default function App() {
         />
       )}
 
-      {/* Real-time Guestbook Modal */}
-      {showGuestbook && (
-        <GuestbookModal onClose={() => setShowGuestbook(false)} />
-      )}
-
-      {/* Code & Physics Inspector Modal */}
-      {showCodeInspector && (
-        <CodeInspectorModal
-          onClose={() => setShowCodeInspector(false)}
-          physicsSettings={physicsSettings}
-          onUpdatePhysics={setPhysicsSettings}
-        />
-      )}
-
-      {/* Gemini AI Multi-Turn Co-Pilot Modal */}
+      {/* Gemini AI Multi-Turn Co-Pilot Modal (Commented out for now)
       {showGeminiChat && (
         <GeminiChatModal
           onClose={() => setShowGeminiChat(false)}
@@ -377,6 +354,16 @@ export default function App() {
           }}
         />
       )}
+      */}
+
+      {/* Real-time Firebase Guestbook Modal */}
+      {showGuestbook && (
+        <GuestbookModal onClose={() => setShowGuestbook(false)} />
+      )}
+
+      {/* Floating Ambient AI Customer Support Center Widget (Commented out for now)
+      <SupportWidget onNavigateToPortal={() => navigateTo('support')} />
+      */}
     </div>
   );
 }
