@@ -12,6 +12,7 @@ import { sound } from '../utils/sound';
 import {
   subscribeToGuestbook,
   postGuestbookMessage,
+  logAnalyticsEvent,
 } from '../lib/firebase';
 
 interface GuestbookModalProps {
@@ -97,6 +98,10 @@ export const GuestbookModal: React.FC<GuestbookModalProps> = ({ onClose }) => {
 
       if (res.success) {
         setSubmitNotice('✓ Message published to live board!');
+        logAnalyticsEvent('guestbook_endorsement_posted', {
+          rating: newMsg.rating,
+          has_role: Boolean(newMsg.role),
+        });
       } else {
         setSubmitNotice('✓ Saved locally & broadcast to active explorers.');
       }

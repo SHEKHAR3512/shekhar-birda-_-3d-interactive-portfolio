@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Compass, Flame, ShieldAlert, Zap } from 'lucide-react';
-import { flightInput } from '../solar-system/Starfighter';
+import { flightInput } from '../space/SpaceExperience';
 import { useMissionStore } from '../../store/missionStore';
 
 export function FlightControlsOverlay() {

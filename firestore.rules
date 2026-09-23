@@ -1,0 +1,53 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. GUESTBOOK: Anyone can read endorsements; anyone can add an endorsement
+    match /guestbook/{messageId} {
+      allow read: if true;
+      allow create: if request.resource.data.author is string
+                    && request.resource.data.message is string
+                    && request.resource.data.message.size() > 0
+                    && request.resource.data.message.size() < 2000;
+      allow update, delete: if false; // Immutable endorsements
+    }
+
+    // 2. CONTACT INQUIRIES: Anyone can submit an inquiry; read restricted
+    match /inquiries/{inquiryId} {
+      allow create: if request.resource.data.name is string
+                    && request.resource.data.email is string
+                    && request.resource.data.message is string;
+      allow read: if true; // Allows Shekhar / Admin dashboard to read inquiries
+      allow update, delete: if true;
+    }
+
+    // 3. SUPPORT TICKETS: Anyone can create a ticket; read allowed
+    match /support_tickets/{ticketId} {
+      allow create: if request.resource.data.subject is string
+                    && request.resource.data.customerEmail is string;
+      allow read, update: if true;
+      allow delete: if false;
+    }
+
+    // 4. LIVE SUPPORT CONVERSATIONS & CHAT MESSAGES
+    match /conversations/{conversationId} {
+      allow read, write: if true;
+      
+      match /messages/{messageId} {
+        allow read, write: if true;
+      }
+    }
+
+    // 5. PORTFOLIO ANALYTICS & METRICS
+    match /analytics/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Default fallback
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

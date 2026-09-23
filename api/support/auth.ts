@@ -6,7 +6,7 @@ export default function handler(req: any, res: any) {
   }
 
   const { passcode } = req.body || {};
-  const adminSecret = process.env.AUTH_SECRET || 'shekhar-admin-2025';
+  const adminSecret = process.env.AUTH_SECRET || 'SHEKHAR999';
 
   if (passcode === adminSecret) {
     const token = `adm_${Buffer.from(Date.now().toString()).toString('base64')}_sec`;

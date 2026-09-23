@@ -22,7 +22,7 @@ import {
 import confetti from 'canvas-confetti';
 import { PERSONAL_INFO } from '../data/portfolioData';
 import { sound } from '../utils/sound';
-import { saveContactInquiry, isFirebaseConfigured } from '../lib/firebase';
+import { saveContactInquiry, isFirebaseConfigured, logAnalyticsEvent } from '../lib/firebase';
 
 interface ContactModalProps {
   onClose: () => void;
@@ -84,34 +84,49 @@ export const ContactModal: React.FC<ContactModalProps> = ({ onClose, initialSubj
         senderCompany || 'N/A'
       }\nContact Email: ${senderEmail || 'N/A'}`;
 
+    const inquiryPayload = {
+      name: senderName.trim() || 'Visitor / Recruiter',
+      email: senderEmail.trim() || 'N/A',
+      company: senderCompany.trim() || 'N/A',
+      subject: subjectText,
+      message: bodyContent,
+    };
+
     // 1. Asynchronously persist to Firebase Firestore 'inquiries' collection
+    let savedToCloud = false;
     try {
-      await saveContactInquiry({
-        name: senderName.trim() || 'Visitor / Recruiter',
-        email: senderEmail.trim() || 'N/A',
-        company: senderCompany.trim() || 'N/A',
-        subject: subjectText,
-        message: bodyContent,
-      });
-      setCloudNotice('✓ Inquiry recorded in Shekhar\'s cloud database!');
+      const res = await saveContactInquiry(inquiryPayload);
+      if (res.success) {
+        savedToCloud = true;
+        setCloudNotice('✓ Inquiry securely stored in Shekhar\'s Firebase cloud database!');
+      } else {
+        setCloudNotice('✓ Inquiry recorded to local session backup.');
+      }
     } catch {
-      setCloudNotice('✓ Saved to local session storage.');
+      setCloudNotice('✓ Inquiry recorded to local session backup.');
     }
 
-    // 2. Open email client with pre-filled details
-    const mailtoUrl = `mailto:${PERSONAL_INFO.email}?subject=${encodeURIComponent(
-      subjectText
-    )}&body=${encodeURIComponent(bodyContent)}`;
+    // 2. Dispatch to backend API /api/contact for server-side SMTP email notification
+    try {
+      await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(inquiryPayload),
+      });
+    } catch (err) {
+      console.warn('Backend email alert notice:', err);
+    }
 
-    window.location.href = mailtoUrl;
+    // 3. Track in Firebase Analytics
+    logAnalyticsEvent('contact_inquiry_submitted', {
+      subject: subjectText,
+      has_company: Boolean(senderCompany.trim()),
+      saved_to_cloud: savedToCloud,
+    });
 
     sound.playCoin();
     confetti({ particleCount: 70, spread: 70, origin: { y: 0.6 } });
     setStatus('sent');
-    setTimeout(() => {
-      setStatus('idle');
-      setCloudNotice(null);
-    }, 6000);
   };
 
   // Download digital vCard (.vcf)
@@ -364,31 +379,78 @@ export const ContactModal: React.FC<ContactModalProps> = ({ onClose, initialSubj
                 />
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
-                <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                  {cloudNotice ? (
-                    <span className="text-slate-300 font-mono flex items-center gap-1.5">
-                      <Database className="w-3.5 h-3.5 text-slate-300" />
-                      {cloudNotice}
-                    </span>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Saves to Shekhar's cloud inbox & opens mail to {PERSONAL_INFO.email}</span>
-                    </>
-                  )}
+              {status === 'sent' ? (
+                <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-200 text-xs space-y-3 font-mono">
+                  <div className="flex items-center gap-2 text-emerald-300 font-bold">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>Transmission Successfully Dispatched & Recorded!</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-200/80 leading-relaxed font-sans">
+                    Your inquiry has been logged in Shekhar's live Firebase Firestore database and forwarded to his notification channel. For immediate urgent response, choose an instant channel below:
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2 pt-1 font-sans">
+                    <a
+                      href={`https://wa.me/919996231869?text=${encodeURIComponent(
+                        `Hi Shekhar, I just submitted an inquiry on your portfolio:\n\nSubject: ${
+                          initialSubject || currentTemplate.subject
+                        }\n\n${message || currentTemplate.defaultBody}`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] transition-colors"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      <span>Direct WhatsApp (+91 9996231869)</span>
+                    </a>
+                    <a
+                      href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
+                        PERSONAL_INFO.email
+                      )}&su=${encodeURIComponent(
+                        initialSubject || currentTemplate.subject
+                      )}&body=${encodeURIComponent(message || currentTemplate.defaultBody)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-[11px] transition-colors"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      <span>Open in Gmail Web</span>
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setStatus('idle')}
+                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] transition-colors cursor-pointer"
+                    >
+                      Send Another
+                    </button>
+                  </div>
                 </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+                  <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                    {cloudNotice ? (
+                      <span className="text-slate-300 font-mono flex items-center gap-1.5">
+                        <Database className="w-3.5 h-3.5 text-slate-300" />
+                        {cloudNotice}
+                      </span>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Saves to Shekhar's cloud database & alerts {PERSONAL_INFO.email}</span>
+                      </>
+                    )}
+                  </div>
 
-                <button
-                  type="submit"
-                  disabled={status === 'sending'}
-                  id="send-email-dispatch-btn"
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs bg-[#f1f5f9] text-[#0f172a] hover:bg-white disabled:opacity-60 shadow-sm transition-all cursor-pointer active:scale-95 font-mono"
-                >
-                  <Send className="w-3.5 h-3.5 text-[#0f172a]" />
-                  <span>{status === 'sending' ? 'Saving & Launching...' : 'Send Inquiry'}</span>
-                </button>
-              </div>
+                  <button
+                    type="submit"
+                    disabled={status === 'sending'}
+                    id="send-email-dispatch-btn"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs bg-[#f1f5f9] text-[#0f172a] hover:bg-white disabled:opacity-60 shadow-sm transition-all cursor-pointer active:scale-95 font-mono"
+                  >
+                    <Send className="w-3.5 h-3.5 text-[#0f172a]" />
+                    <span>{status === 'sending' ? 'Saving & Dispatching...' : 'Send Inquiry'}</span>
+                  </button>
+                </div>
+              )}
             </form>
           </div>
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Navbar } from './components/navigation/Navbar';
 import { ResumeLandingView } from './components/resume/ResumeLandingView';
 import { MissionBootSequence } from './components/mission/MissionBootSequence';
-import { SolarSystemScene } from './components/solar-system/SolarSystemScene';
+import { SpaceExperience } from './components/space/SpaceExperience';
 import { CockpitOverlay } from './components/hud/CockpitOverlay';
 import { MissionTelemetry } from './components/hud/MissionTelemetry';
 import { PilotCard } from './components/hud/PilotCard';
@@ -245,8 +245,8 @@ export default function App() {
         {/* ================= EXPERIENCE 2: CONTROLLABLE SPACECRAFT SOLAR SYSTEM ================= */}
         {currentExperience === 'solar-system' && (
           <>
-            {/* 3D WebGL Flight Canvas */}
-            <SolarSystemScene />
+            {/* 3D WebGL Flight Canvas (Powered by Babylon.js) */}
+            <SpaceExperience />
 
             {/* Spaceship Cockpit Overlay & Coordinates Telemetry */}
             <CockpitOverlay />

@@ -11,7 +11,7 @@ import {
   serverTimestamp,
   Firestore,
 } from 'firebase/firestore';
-import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
+import { getAnalytics, isSupported, Analytics, logEvent } from 'firebase/analytics';
 import { GuestbookMessage, ContactInquiry } from '../types';
 
 // Web App's Firebase configuration
@@ -41,6 +41,7 @@ try {
       isSupported().then((supported) => {
         if (supported && app) {
           analytics = getAnalytics(app);
+          logEvent(analytics, 'app_initialized', { app_name: 'Shekhar Birda 3D Cosmos' });
         }
       }).catch(() => {
         // Analytics optional in restricted iframe environments
@@ -62,6 +63,47 @@ export const getFirebaseConfigSummary = () => ({
   authDomain: firebaseConfig.authDomain,
   isConfigured: isFirebaseConfigured(),
 });
+
+/**
+ * Logs an event to Firebase Analytics with safe fallback
+ */
+export function logAnalyticsEvent(eventName: string, params?: Record<string, any>) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (analytics) {
+      logEvent(analytics, eventName, params);
+    }
+  } catch (err) {
+    // Graceful no-op if blocked by ad-blocker
+  }
+}
+
+/**
+ * Fetches real-time document counts from Firestore for Live Dashboard Analytics
+ */
+export async function getLiveFirestoreMetrics(): Promise<{
+  inquiriesCount: number;
+  ticketsCount: number;
+  guestbookCount: number;
+}> {
+  if (!db) {
+    return { inquiriesCount: 0, ticketsCount: 0, guestbookCount: 0 };
+  }
+  try {
+    const [inqSnap, ticketSnap, gbSnap] = await Promise.all([
+      getDocs(collection(db, 'inquiries')).catch(() => null),
+      getDocs(collection(db, 'support_tickets')).catch(() => null),
+      getDocs(collection(db, 'guestbook')).catch(() => null),
+    ]);
+    return {
+      inquiriesCount: inqSnap?.size || 0,
+      ticketsCount: ticketSnap?.size || 0,
+      guestbookCount: gbSnap?.size || 0,
+    };
+  } catch {
+    return { inquiriesCount: 0, ticketsCount: 0, guestbookCount: 0 };
+  }
+}
 
 /**
  * Saves a new recruiter/client work inquiry into Firestore 'inquiries' collection

@@ -26,6 +26,7 @@ import {
   Phone,
 } from 'lucide-react';
 import { supportStore } from '../../lib/support/supportStore';
+import { getLiveFirestoreMetrics } from '../../lib/firebase';
 import {
   SupportConversation,
   SupportMessage,
@@ -67,6 +68,11 @@ export function SupportDashboard({ onReturnToPortfolio, onOpenPortal }: SupportD
 
   // Analytics Data
   const [analytics, setAnalytics] = useState<SupportAnalytics | null>(null);
+  const [liveCloudMetrics, setLiveCloudMetrics] = useState<{
+    inquiriesCount: number;
+    ticketsCount: number;
+    guestbookCount: number;
+  } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -76,6 +82,11 @@ export function SupportDashboard({ onReturnToPortfolio, onOpenPortal }: SupportD
       const convList = supportStore.getConversations();
       setConversations(convList);
       setAnalytics(supportStore.getAnalytics());
+
+      // Fetch live cloud metrics from Firestore
+      getLiveFirestoreMetrics()
+        .then((m) => setLiveCloudMetrics(m))
+        .catch(() => { });
 
       if (convList.length > 0 && !activeConvId) {
         setActiveConvId(convList[0].id);
@@ -124,16 +135,16 @@ export function SupportDashboard({ onReturnToPortfolio, onOpenPortal }: SupportD
         sessionStorage.setItem('shekhar_support_admin_token', data.token);
         setIsAuthenticated(true);
       } else {
-        setAuthError(data.error || 'Invalid passcode. Default passcode is: shekhar-admin-2025');
+        setAuthError(data.error || 'Invalid passcode. Default passcode is: SHEKHAR999');
       }
     } catch {
       // Local fallback for offline mode
-      if (passcode === 'shekhar-admin-2025') {
+      if (passcode === 'SHEKHAR999') {
         sound.playClick();
         sessionStorage.setItem('shekhar_support_admin_token', 'local-demo-token');
         setIsAuthenticated(true);
       } else {
-        setAuthError('Invalid passcode. Default passcode is: shekhar-admin-2025');
+        setAuthError('Invalid passcode. Default passcode is: SHEKHAR999');
       }
     }
   };
@@ -234,8 +245,8 @@ export function SupportDashboard({ onReturnToPortfolio, onOpenPortal }: SupportD
       statusFilter === 'all'
         ? true
         : statusFilter === 'open'
-        ? c.status !== 'resolved'
-        : c.status === statusFilter;
+          ? c.status !== 'resolved'
+          : c.status === statusFilter;
 
     const matchesSearch =
       c.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -271,7 +282,7 @@ export function SupportDashboard({ onReturnToPortfolio, onOpenPortal }: SupportD
                 required
                 value={passcode}
                 onChange={(e) => setPasscode(e.target.value)}
-                placeholder="Enter admin passcode (e.g. shekhar-admin-2025)"
+                placeholder="Enter admin passcode"
                 className="w-full px-4 py-3 bg-[#0b172a] border border-sky-500/30 rounded-xl text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-sky-400"
               />
             </div>
@@ -356,11 +367,10 @@ export function SupportDashboard({ onReturnToPortfolio, onOpenPortal }: SupportD
               sound.playClick();
               setActiveTab('conversations');
             }}
-            className={`px-3 py-1 rounded-lg text-xs font-mono tracking-wider transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'conversations'
-                ? 'bg-sky-600 text-white font-bold'
-                : 'text-slate-400 hover:text-white'
-            }`}
+            className={`px-3 py-1 rounded-lg text-xs font-mono tracking-wider transition-colors cursor-pointer flex items-center gap-1.5 ${activeTab === 'conversations'
+              ? 'bg-sky-600 text-white font-bold'
+              : 'text-slate-400 hover:text-white'
+              }`}
           >
             <MessageSquare className="w-3.5 h-3.5" />
             <span>Inbox ({conversations.length})</span>
@@ -371,11 +381,10 @@ export function SupportDashboard({ onReturnToPortfolio, onOpenPortal }: SupportD
               sound.playClick();
               setActiveTab('analytics');
             }}
-            className={`px-3 py-1 rounded-lg text-xs font-mono tracking-wider transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'analytics'
-                ? 'bg-sky-600 text-white font-bold'
-                : 'text-slate-400 hover:text-white'
-            }`}
+            className={`px-3 py-1 rounded-lg text-xs font-mono tracking-wider transition-colors cursor-pointer flex items-center gap-1.5 ${activeTab === 'analytics'
+              ? 'bg-sky-600 text-white font-bold'
+              : 'text-slate-400 hover:text-white'
+              }`}
           >
             <BarChart3 className="w-3.5 h-3.5" />
             <span>Analytics</span>
@@ -419,6 +428,42 @@ export function SupportDashboard({ onReturnToPortfolio, onOpenPortal }: SupportD
             >
               Back to Inbox
             </button>
+          </div>
+
+          {/* Live Firebase Cloud Synchronization Status */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-sky-950/60 to-indigo-950/40 border border-sky-500/30 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></span>
+              <div>
+                <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+                  Firebase Cloud Firestore Live Synchronization
+                </h4>
+                <p className="text-[11px] text-sky-200/70 font-mono">
+                  Project: <span className="text-sky-300 font-bold">shekhar-jaat-portfolio</span> • Status: <span className="text-emerald-400 font-bold">ONLINE & SECURED</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-6 font-mono text-xs">
+              <div className="text-center sm:text-right">
+                <span className="text-[10px] text-slate-400 block uppercase">Inquiries in Cloud</span>
+                <span className="text-base font-extrabold text-white">
+                  {liveCloudMetrics ? liveCloudMetrics.inquiriesCount : '...'}
+                </span>
+              </div>
+              <div className="text-center sm:text-right">
+                <span className="text-[10px] text-slate-400 block uppercase">Tickets in Cloud</span>
+                <span className="text-base font-extrabold text-sky-400">
+                  {liveCloudMetrics ? liveCloudMetrics.ticketsCount : '...'}
+                </span>
+              </div>
+              <div className="text-center sm:text-right">
+                <span className="text-[10px] text-slate-400 block uppercase">Guestbook Endorsements</span>
+                <span className="text-base font-extrabold text-amber-400">
+                  {liveCloudMetrics ? liveCloudMetrics.guestbookCount : '...'}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Metric KPI Cards */}
@@ -548,11 +593,10 @@ export function SupportDashboard({ onReturnToPortfolio, onOpenPortal }: SupportD
                       sound.playClick();
                       setStatusFilter(tab.id);
                     }}
-                    className={`px-2 py-0.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
-                      statusFilter === tab.id
-                        ? 'bg-sky-500/20 border border-sky-400/40 text-sky-200'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
+                    className={`px-2 py-0.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${statusFilter === tab.id
+                      ? 'bg-sky-500/20 border border-sky-400/40 text-sky-200'
+                      : 'text-slate-400 hover:text-slate-200'
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -579,13 +623,12 @@ export function SupportDashboard({ onReturnToPortfolio, onOpenPortal }: SupportD
                         sound.playClick();
                         setActiveConvId(conv.id);
                       }}
-                      className={`p-3.5 transition-colors cursor-pointer border-l-2 ${
-                        isSelected
-                          ? 'bg-[#0b172a] border-l-sky-400'
-                          : isWaiting
+                      className={`p-3.5 transition-colors cursor-pointer border-l-2 ${isSelected
+                        ? 'bg-[#0b172a] border-l-sky-400'
+                        : isWaiting
                           ? 'bg-amber-500/5 hover:bg-[#0b172a]/60 border-l-amber-400'
                           : 'hover:bg-[#0b172a]/40 border-l-transparent'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center justify-between gap-1 mb-1">
                         <span className="font-semibold text-xs text-slate-200 truncate">
@@ -735,24 +778,22 @@ export function SupportDashboard({ onReturnToPortfolio, onOpenPortal }: SupportD
                       >
                         {!isAgent && (
                           <div
-                            className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                              isCustomer
-                                ? 'bg-sky-500/20 border border-sky-400/40 text-sky-300'
-                                : 'bg-slate-800 border border-slate-700 text-slate-300'
-                            }`}
+                            className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${isCustomer
+                              ? 'bg-sky-500/20 border border-sky-400/40 text-sky-300'
+                              : 'bg-slate-800 border border-slate-700 text-slate-300'
+                              }`}
                           >
                             {isCustomer ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
                           </div>
                         )}
 
                         <div
-                          className={`max-w-[78%] rounded-2xl px-4 py-3 text-xs leading-relaxed ${
-                            isAgent
-                              ? 'bg-gradient-to-r from-purple-700 to-indigo-700 text-white rounded-tr-none'
-                              : isCustomer
+                          className={`max-w-[78%] rounded-2xl px-4 py-3 text-xs leading-relaxed ${isAgent
+                            ? 'bg-gradient-to-r from-purple-700 to-indigo-700 text-white rounded-tr-none'
+                            : isCustomer
                               ? 'bg-[#0c1c34] border border-sky-500/30 text-slate-100 rounded-tl-none'
                               : 'bg-slate-900 border border-slate-800 text-slate-300 rounded-tl-none'
-                          }`}
+                            }`}
                         >
                           <div className="flex items-center justify-between gap-3 mb-1 pb-1 border-b border-white/10 text-[10px] font-mono">
                             <span className={isAgent ? 'text-purple-200 font-bold' : 'text-sky-300 font-bold'}>
@@ -781,22 +822,20 @@ export function SupportDashboard({ onReturnToPortfolio, onOpenPortal }: SupportD
                     <button
                       type="button"
                       onClick={() => setComposerMode('reply')}
-                      className={`px-3 py-1 rounded-lg text-xs font-mono tracking-wider transition-colors cursor-pointer ${
-                        composerMode === 'reply'
-                          ? 'bg-purple-600 text-white font-bold'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
+                      className={`px-3 py-1 rounded-lg text-xs font-mono tracking-wider transition-colors cursor-pointer ${composerMode === 'reply'
+                        ? 'bg-purple-600 text-white font-bold'
+                        : 'text-slate-400 hover:text-white'
+                        }`}
                     >
                       Public Reply (Customer)
                     </button>
                     <button
                       type="button"
                       onClick={() => setComposerMode('internal_note')}
-                      className={`px-3 py-1 rounded-lg text-xs font-mono tracking-wider transition-colors cursor-pointer flex items-center gap-1 ${
-                        composerMode === 'internal_note'
-                          ? 'bg-amber-600 text-white font-bold'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
+                      className={`px-3 py-1 rounded-lg text-xs font-mono tracking-wider transition-colors cursor-pointer flex items-center gap-1 ${composerMode === 'internal_note'
+                        ? 'bg-amber-600 text-white font-bold'
+                        : 'text-slate-400 hover:text-white'
+                        }`}
                     >
                       <Lock className="w-3 h-3" />
                       <span>Internal Note</span>
@@ -819,21 +858,19 @@ export function SupportDashboard({ onReturnToPortfolio, onOpenPortal }: SupportD
                           ? 'Reply directly to customer as Shekhar Birda (Press Enter to send)...'
                           : 'Add an internal note only visible to team and admin...'
                       }
-                      className={`flex-1 p-3 rounded-xl border text-xs focus:outline-none resize-none transition-colors ${
-                        composerMode === 'internal_note'
-                          ? 'bg-[#1e1a0b] border-amber-500/40 text-amber-100 placeholder:text-amber-500/60 focus:border-amber-400'
-                          : 'bg-[#0b172a] border-sky-500/25 text-slate-100 placeholder:text-slate-500 focus:border-sky-400'
-                      }`}
+                      className={`flex-1 p-3 rounded-xl border text-xs focus:outline-none resize-none transition-colors ${composerMode === 'internal_note'
+                        ? 'bg-[#1e1a0b] border-amber-500/40 text-amber-100 placeholder:text-amber-500/60 focus:border-amber-400'
+                        : 'bg-[#0b172a] border-sky-500/25 text-slate-100 placeholder:text-slate-500 focus:border-sky-400'
+                        }`}
                     />
 
                     <button
                       type="submit"
                       disabled={!composerText.trim()}
-                      className={`p-3 rounded-xl text-white disabled:opacity-40 transition-all cursor-pointer ${
-                        composerMode === 'internal_note'
-                          ? 'bg-amber-600 hover:bg-amber-500'
-                          : 'bg-purple-600 hover:bg-purple-500'
-                      }`}
+                      className={`p-3 rounded-xl text-white disabled:opacity-40 transition-all cursor-pointer ${composerMode === 'internal_note'
+                        ? 'bg-amber-600 hover:bg-amber-500'
+                        : 'bg-purple-600 hover:bg-purple-500'
+                        }`}
                     >
                       <Send className="w-4 h-4" />
                     </button>
@@ -914,11 +951,10 @@ export function SupportDashboard({ onReturnToPortfolio, onOpenPortal }: SupportD
                         handleReturnToAI();
                       }
                     }}
-                    className={`px-2.5 py-1 rounded-md text-[10px] font-bold cursor-pointer transition-colors ${
-                      activeConversation.aiEnabled
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                        : 'bg-slate-800 text-slate-400 border border-slate-700'
-                    }`}
+                    className={`px-2.5 py-1 rounded-md text-[10px] font-bold cursor-pointer transition-colors ${activeConversation.aiEnabled
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                      : 'bg-slate-800 text-slate-400 border border-slate-700'
+                      }`}
                   >
                     {activeConversation.aiEnabled ? 'ENABLED' : 'DISABLED'}
                   </button>

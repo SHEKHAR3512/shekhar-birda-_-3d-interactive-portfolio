@@ -23,6 +23,7 @@ import {
 import { PORTFOLIO_KNOWLEDGE_DOCS, queryKnowledgeDocs } from '../../lib/knowledge/knowledgeBase';
 import { KnowledgeDoc, SupportTicket } from '../../lib/support/types';
 import { supportStore } from '../../lib/support/supportStore';
+import { logAnalyticsEvent } from '../../lib/firebase';
 import { sound } from '../../utils/sound';
 import { SupportWidget } from './SupportWidget';
 
@@ -98,6 +99,22 @@ export function CustomerSupportPortal({ onReturnToPortfolio, onOpenAdmin }: Cust
       priority: ticketPriority,
       customerName: ticketName || 'Anonymous',
       customerEmail: ticketEmail,
+    });
+
+    // Dispatch background email alert to Shekhar
+    fetch('/api/support/ticket', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newTicket),
+    }).catch((err) => {
+      console.warn('Support ticket email alert notice:', err);
+    });
+
+    // Log in Firebase Analytics
+    logAnalyticsEvent('support_ticket_created', {
+      category: ticketCategory,
+      priority: ticketPriority,
+      ticket_id: newTicket.id,
     });
 
     setSubmittedTicket(newTicket);
