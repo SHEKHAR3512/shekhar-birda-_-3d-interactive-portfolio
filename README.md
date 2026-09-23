@@ -199,10 +199,10 @@ GEMINI_API_KEY=""
 # Email Notifications (Gmail SMTP)
 EMAIL_HOST="smtp.gmail.com"
 EMAIL_PORT="465"
-EMAIL_USER="shekharjaat751@gmail.com"
+EMAIL_USER="your_email@gmail.com"
 EMAIL_PASSWORD="your_16_char_google_app_password"
-NOTIFICATION_EMAIL="shekharjaat751@gmail.com"
-SUPPORT_EMAIL="shekharjaat751@gmail.com"
+NOTIFICATION_EMAIL="your_email@gmail.com"
+SUPPORT_EMAIL="your_email@gmail.com"
 SENDER_NAME="Shekhar Birda Portfolio"
 
 # Google Firebase Configuration
